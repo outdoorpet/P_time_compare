@@ -250,8 +250,11 @@ class MainWindow(QtGui.QWidget):
             # Dont display the tooltip
             pass
         elif not self.gather_events_checkbox.isChecked():
-            x_coord = UTCDateTime(self.plot.vb.mapSceneToView(pos).toPoint().x()).ctime()
-            self.time_tool = self.plot.setToolTip(x_coord)
+            try:
+                x_coord = UTCDateTime(self.plot.vb.mapSceneToView(pos).toPoint().x()).ctime()
+                self.time_tool = self.plot.setToolTip(x_coord)
+            except:
+                pass
 
     def gather_events_checkbox_selected(self):
         self.sort_method_selected(self.sort_drop_down_button, ('no_sort', 'no_sort'), False)
@@ -281,7 +284,7 @@ class MainWindow(QtGui.QWidget):
         if not self.gather_events_checkbox.isChecked():
 
             # Set up the plotting area
-            self.plot = self.graph_view.addPlot(0, 0, title="Time Difference",
+            self.plot = self.graph_view.addPlot(0, 0, title="Time Difference: P Theoretical - P Picked (crosses)",
                                                 axisItems={'bottom': DateAxisItem(orientation='bottom',
                                                                                   utcOffset=0), 'left': y_axis_string})
             self.plot.setMouseEnabled(x=True, y=False)
@@ -324,7 +327,7 @@ class MainWindow(QtGui.QWidget):
             x_axis_string.setTicks([rearr_midpoint_dict])
 
             # Set up the plotting area
-            self.plot = self.graph_view.addPlot(0, 0, title="Time Difference",
+            self.plot = self.graph_view.addPlot(0, 0, title="Time Difference: P Theoretical - P Picked (crosses)",
                                                 axisItems={'left': y_axis_string, 'bottom': x_axis_string})
             self.plot.setMouseEnabled(x=True, y=False)
 
@@ -574,6 +577,10 @@ class MainWindow(QtGui.QWidget):
 
         self.picks_df.reset_index(drop=True, inplace=True)
         self.picks_df = self.picks_df.drop(['P_pick_time', 'P_as_pick_time'], axis=1)
+        #drop any rows that have Nan in the P_as column (i.e. there is no pick for it - probably means
+        # data is to noisy to pick)
+        self.picks_df.dropna(subset=['P_as_pick_time_UTC'], inplace=True)
+        self.picks_df.reset_index(drop=True, inplace=True)
 
         # Now normalize the tt_diff column to get colors
         max_val = self.picks_df['tt_diff'].max()
@@ -741,6 +748,11 @@ class MainWindow(QtGui.QWidget):
 
 
 if __name__ == '__main__':
+    proxy = raw_input("Proxy:")
+    port = raw_input("Proxy Port:")
+    networkProxy = QtNetwork.QNetworkProxy(QtNetwork.QNetworkProxy.HttpProxy, proxy, int(port))
+    QtNetwork.QNetworkProxy.setApplicationProxy(networkProxy)
+
     app = QtGui.QApplication([])
     w = MainWindow()
     w.raise_()
