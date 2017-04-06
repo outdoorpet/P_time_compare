@@ -7,6 +7,8 @@ import os
 import pyqtgraph as pg
 import numpy as np
 from DateAxisItem import DateAxisItem
+from query_input_yes_no import query_yes_no
+import sys
 
 
 class PandasModel(QtCore.QAbstractTableModel):
@@ -24,7 +26,8 @@ class PandasModel(QtCore.QAbstractTableModel):
         self.pick_nm = pick_nm
 
         # Column headers for tables
-        self.cat_col_header = ['Event ID', 'Lat (dd)', 'Lon  (dd)', 'Depth (km)', 'Mag', 'Time (UTC)']
+        self.cat_col_header = ['Event ID', 'Time (UTC Timestamp)', 'Lat (dd)', 'Lon  (dd)',
+                               'Depth (km)', 'Mag', 'Time (UTC)', 'Julian Day']
         self.pick_col_header = ['Station', 'Event ID', 'Arr Time Residual (s)', 'P Arr Time (UTC)',
                                 'P_as Arr Time (UTC)']
 
@@ -412,13 +415,11 @@ class MainWindow(QtGui.QWidget):
 
         dropped_cat_df = self.cat_df
 
-        # make UTC string from earthquake cat
+        # make UTC string from earthquake cat and add julian day column
         def mk_cat_UTC_str(row):
-            return (UTCDateTime(row['qtime']).ctime())
+            return (pd.Series([UTCDateTime(row['qtime']).ctime(), UTCDateTime(row['qtime']).julday]))
 
-        dropped_cat_df['Q_time'] = dropped_cat_df.apply(mk_cat_UTC_str, axis=1)
-
-        dropped_cat_df = dropped_cat_df.drop(['qtime'], axis=1)
+        dropped_cat_df[['Q_time_str', 'julday']] = dropped_cat_df.apply(mk_cat_UTC_str, axis=1)
 
         self.tbld = TableDialog(parent=self, cat_df=dropped_cat_df, pick_df=dropped_picks_df)
 
@@ -637,7 +638,7 @@ class MainWindow(QtGui.QWidget):
 
             self.cat_df.loc[_i] = [str(event.resource_id.id).split('=')[1], int(origin_info.time.timestamp),
                                    origin_info.latitude, origin_info.longitude,
-                                   origin_info.depth, magnitude]
+                                   origin_info.depth/1000, magnitude]
 
         self.cat_df.reset_index(drop=True, inplace=True)
 
@@ -748,10 +749,18 @@ class MainWindow(QtGui.QWidget):
 
 
 if __name__ == '__main__':
-    proxy = raw_input("Proxy:")
-    port = raw_input("Proxy Port:")
-    networkProxy = QtNetwork.QNetworkProxy(QtNetwork.QNetworkProxy.HttpProxy, proxy, int(port))
-    QtNetwork.QNetworkProxy.setApplicationProxy(networkProxy)
+    proxy_queary = query_yes_no("Input Proxy Settings?")
+    print('')
+
+    if proxy_queary:
+        proxy = raw_input("Proxy:")
+        port = raw_input("Proxy Port:")
+        try:
+            networkProxy = QtNetwork.QNetworkProxy(QtNetwork.QNetworkProxy.HttpProxy, proxy, int(port))
+            QtNetwork.QNetworkProxy.setApplicationProxy(networkProxy)
+        except ValueError:
+            print('No proxy settings supplied..')
+            sys.exit()
 
     app = QtGui.QApplication([])
     w = MainWindow()
