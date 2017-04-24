@@ -94,6 +94,50 @@ class TableDialog(QtGui.QDialog):
         self.show()
 
 
+class SingleStnPlot(QtGui.QDialog):
+    """
+    Pop up window for plotting single station graph
+    """
+
+    def __init__(self, parent=None, picks_df_stn = None, col_list = None, x_axis_string = None, stn=None):
+        super(SingleStnPlot, self).__init__(parent)
+
+        self.picks_df_stn = picks_df_stn
+        self.col_list = col_list
+        self.x_axis_string = x_axis_string
+        self.stn = stn
+
+        self.initUI()
+
+    def initUI(self):
+        self.layout = QtGui.QVBoxLayout(self)
+
+        self.single_stn_graph_view = pg.GraphicsLayoutWidget()
+        self.layout.addWidget(self.single_stn_graph_view)
+
+        self.update_stn_graph()
+
+        self.show()
+
+    def update_stn_graph(self):
+        self.single_stn_graph_view.clear()
+
+        # Set up the plotting area
+        self.plot_area = self.single_stn_graph_view.addPlot(0, 0,
+                                                       title="Time Difference: P Theoretical - P Picked "
+                                                             "(crosses) for Station: "+self.stn,
+                                                       axisItems={'bottom': self.x_axis_string})
+        self.plot_area.setMouseEnabled(x=True, y=False)
+
+        # Plot midway scatter points between time diff
+        self.time_diff_scatter_plot = pg.ScatterPlotItem(pxMode=True)
+        # self.time_diff_scatter_plot.sigClicked.connect(self.scatter_point_clicked)
+        self.time_diff_scatter_plot.addPoints(self.picks_df_stn['alt_midpoints'],
+                                         self.picks_df_stn['tt_diff'], size=9,
+                                         brush=self.col_list)
+        self.plot_area.addItem(self.time_diff_scatter_plot)
+
+
 class MainWindow(QtGui.QWidget):
     """
     Main Window for Timing Error QC Application
@@ -132,6 +176,11 @@ class MainWindow(QtGui.QWidget):
         self.sort_drop_down_button.setEnabled(False)
         buttons_hbox.addWidget(self.sort_drop_down_button)
 
+        # Button for plotting for single station
+        self.plot_single_stn_button = QtGui.QPushButton('Plot Single Stn')
+        self.plot_single_stn_button.setEnabled(False)
+        buttons_hbox.addWidget(self.plot_single_stn_button)
+
         # Button to Bring all events together onto a closer X axis
         self.gather_events_checkbox = QtGui.QCheckBox('Gather Events')
         Gather = functools.partial(self.gather_events_checkbox_selected)
@@ -146,6 +195,7 @@ class MainWindow(QtGui.QWidget):
         left_grid_lay = QtGui.QGridLayout()
 
         self.graph_view = pg.GraphicsLayoutWidget()
+        self.single_stn_graph_view = pg.GraphicsLayoutWidget()
 
         left_grid_lay.addWidget(self.graph_view, 0, 0, 3, 6)
 
@@ -244,6 +294,24 @@ class MainWindow(QtGui.QWidget):
             self.axis_station_list = self.spatial_dict[value[0]].sort_values(by='ep_dist')['station'].tolist()
             self.update_graph()
 
+    def plot_single_stn_selected(self, plt_single_pushButton, stn):
+
+        # get events just for the selected stn
+        self.picks_df_stn = self.picks_df.loc[self.picks_df['sta'] == stn]
+
+        # List of colors for individual scatter poinst based on the arr time residual
+        col_list = self.picks_df_stn['col_val'].apply(lambda x: self.col_grad_w.getColor(x)).tolist()
+
+        rearr_midpoint_dict = [(b, a) for a, b in self.midpoint_dict.iteritems()]
+
+        x_axis_string = pg.AxisItem(orientation='bottom')
+        x_axis_string.setTicks([rearr_midpoint_dict])
+
+        print(self.picks_df_stn)
+
+        self.stnplt = SingleStnPlot(parent=self, picks_df_stn = self.picks_df_stn, col_list = col_list,
+                                    x_axis_string = x_axis_string, stn=stn)
+
     def reset_plot_view(self):
         self.sort_method_selected(self.sort_drop_down_button, ('no_sort', 'no_sort'), False)
 
@@ -263,7 +331,7 @@ class MainWindow(QtGui.QWidget):
         self.sort_method_selected(self.sort_drop_down_button, ('no_sort', 'no_sort'), False)
 
     def update_graph(self):
-        # List of colors for individual scatter poinst based on the arr time residual
+        # List of colors for individual scatter points based on the arr time residual
         col_list = self.picks_df['col_val'].apply(lambda x: self.col_grad_w.getColor(x)).tolist()
 
         self.graph_view.clear()
@@ -672,6 +740,8 @@ class MainWindow(QtGui.QWidget):
         midpoint_list = []
         # sort the events by time:
         sorted_events_list = self.cat_df.sort_values(by='qtime')['event_id'].tolist()
+
+        # Now work out x axis values such that the first (in time) event is 0
         for _i, event in enumerate(sorted_events_list):
             print(event)
             if _i == 0:
@@ -747,6 +817,16 @@ class MainWindow(QtGui.QWidget):
 
         self.sort_drop_down_button.setEnabled(True)
 
+        # Now make the plot single station button active
+        # add the stations and to menu dropdown
+        plot_stns_menu = QtGui.QMenu()
+
+        for _i, station in enumerate(unique_stations):
+            plot_stns_menu.addAction(station, functools.partial(
+                self.plot_single_stn_selected, self.plot_single_stn_button, station))
+
+        self.plot_single_stn_button.setMenu(plot_stns_menu)
+        self.plot_single_stn_button.setEnabled(True)
 
 if __name__ == '__main__':
     proxy_queary = query_yes_no("Input Proxy Settings?")
