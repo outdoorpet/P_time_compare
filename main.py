@@ -125,9 +125,11 @@ class SingleStnPlot(QtGui.QDialog):
         # Set up the plotting area
         self.plot_area = self.single_stn_graph_view.addPlot(0, 0,
                                                        title="Time Difference: P Theoretical - P Picked "
-                                                             "(crosses) for Station: "+self.stn,
+                                                             "for Station: "+self.stn,
                                                        axisItems={'bottom': self.x_axis_string})
         self.plot_area.setMouseEnabled(x=True, y=False)
+        self.plot_area.setLabel('left', "TT Residual", units='s')
+        self.plot_area.setLabel('bottom', "Event ID")
 
         # Plot midway scatter points between time diff
         self.time_diff_scatter_plot = pg.ScatterPlotItem(pxMode=True)
@@ -271,7 +273,12 @@ class MainWindow(QtGui.QWidget):
         # if no sort:
         if value[1] == "no_sort":
             sort_pushButton.setText("Sort")
-            self.axis_station_list = self.picks_df['sta'].unique()
+            unique_stations = self.picks_df['sta'].unique()
+
+            stn_list = unique_stations.tolist()
+            stn_list.sort()
+
+            self.axis_station_list = stn_list
             self.update_graph()
         # if sort by station:
         elif value[1] == 0:
@@ -401,6 +408,7 @@ class MainWindow(QtGui.QWidget):
             self.plot = self.graph_view.addPlot(0, 0, title="Time Difference: P Theoretical - P Picked (crosses)",
                                                 axisItems={'left': y_axis_string, 'bottom': x_axis_string})
             self.plot.setMouseEnabled(x=True, y=False)
+            self.plot.setLabel('bottom', "Event ID")
 
             # Re-establish previous view if it exists
             if self.saved_state:
@@ -794,11 +802,14 @@ class MainWindow(QtGui.QWidget):
         # Now create distance to stations dict for each event
         unique_stations = self.picks_df['sta'].unique()
 
+        stn_list = unique_stations.tolist()
+        stn_list.sort()
+
         self.spatial_dict = {}
 
         def calc_spatial_diff(x):
             temp_df = pd.DataFrame(data=None, columns=['station', 'gcarc', 'az', 'ep_dist'])
-            for _i, station in enumerate(unique_stations):
+            for _i, station in enumerate(stn_list):
                 stn_lat = self.inv.select(station=station)[0][0].latitude
                 stn_lon = self.inv.select(station=station)[0][0].longitude
                 # first GCARC dist & az
@@ -821,7 +832,7 @@ class MainWindow(QtGui.QWidget):
         # add the stations and to menu dropdown
         plot_stns_menu = QtGui.QMenu()
 
-        for _i, station in enumerate(unique_stations):
+        for _i, station in enumerate(stn_list):
             plot_stns_menu.addAction(station, functools.partial(
                 self.plot_single_stn_selected, self.plot_single_stn_button, station))
 
