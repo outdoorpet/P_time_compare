@@ -1,4 +1,4 @@
-from PyQt4 import QtCore, QtGui, QtWebKit, QtNetwork
+from PyQt4 import QtCore, QtGui, QtWebKit, QtNetwork, uic
 from obspy import read_inventory, read_events, UTCDateTime
 from obspy.geodetics.base import gps2dist_azimuth, kilometer2degrees
 import pandas as pd
@@ -10,6 +10,8 @@ from DateAxisItem import DateAxisItem
 from query_input_yes_no import query_yes_no
 import sys
 
+residual_set_limit_ui = "residual_set_limit.ui"
+Ui_ResDialog, QtBaseClass = uic.loadUiType(residual_set_limit_ui)
 
 class PandasModel(QtCore.QAbstractTableModel):
     """
@@ -138,6 +140,20 @@ class SingleStnPlot(QtGui.QDialog):
                                          self.picks_df_stn['tt_diff'], size=9,
                                          brush=self.col_list)
         self.plot_area.addItem(self.time_diff_scatter_plot)
+
+
+class ResidualSetLimit(QtGui.QDialog):
+    """
+        Class to select a time residual limit
+    """
+
+    def __init__(self, parent=None):
+        super(ResidualSetLimit, self).__init__(parent)
+        self.resui = Ui_ResDialog()
+        self.resui.setupUi(self)
+
+    def getValues(self):
+        return(float(self.resui.LowerLimitSpinBox.value()), float(self.resui.UpperLimitSpinBox.value()))
 
 
 class MainWindow(QtGui.QWidget):
@@ -468,6 +484,21 @@ class MainWindow(QtGui.QWidget):
             print('Error: No Earthquake Catalogue is Loaded')
             pass
 
+    def tbl_view_popup(self):
+        focus_widget = QtGui.QApplication.focusWidget()
+        # get the selected row number
+        row_number = focus_widget.selectionModel().selectedRows()[0].row()
+        row_index = self.table_accessor[focus_widget][1][row_number]
+
+        self.selected_row = self.picks_df.loc[row_index]
+
+        # set up right click menu
+        self.rc_menu = QtGui.QMenu(self)
+        self.rc_menu.addAction('Plot Single Station Residual', functools.partial(
+            self.plot_single_stn_selected, self.plot_single_stn_button, self.selected_row['sta']))
+
+        self.rc_menu.popup(QtGui.QCursor.pos())
+
     def build_tables(self):
 
         self.table_accessor = None
@@ -498,6 +529,10 @@ class MainWindow(QtGui.QWidget):
         dropped_cat_df[['Q_time_str', 'julday']] = dropped_cat_df.apply(mk_cat_UTC_str, axis=1)
 
         self.tbld = TableDialog(parent=self, cat_df=dropped_cat_df, pick_df=dropped_picks_df)
+
+        # make pick table right clickable for plotting single station
+        self.tbld.pick_table_view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.tbld.pick_table_view.customContextMenuRequested.connect(self.tbl_view_popup)
 
         # Lookup Dictionary for table views
         self.tbl_view_dict = {"cat": self.tbld.cat_event_table_view, "picks": self.tbld.pick_table_view}
@@ -601,6 +636,13 @@ class MainWindow(QtGui.QWidget):
             directory=os.path.expanduser("~"),
             filter="Pick Files (*.pick)")
 
+        # open up dialog to set limits for p-picked - p-theoretical time residual
+        res_dlg = ResidualSetLimit(parent=self)
+        if res_dlg.exec_():
+            self.res_limits = res_dlg.getValues()
+        else:
+            self.res_limits = None
+
         # dictionary to contain pandas merged array for each event
         self.event_df_dict = {}
 
@@ -643,6 +685,12 @@ class MainWindow(QtGui.QWidget):
             P_as_UTC = UTCDateTime(x['P_as_pick_time']).timestamp
 
             time_diff = P_UTC - P_as_UTC
+
+            # check if time diff is outside of desired bounds
+            # if so then append Nan so they are removed
+            if self.res_limits:
+                if not self.res_limits[0] <= time_diff <= self.res_limits[1]:
+                    return(pd.Series([np.nan, np.nan, np.nan]))
 
             return (pd.Series([P_UTC, P_as_UTC, time_diff]))
 
