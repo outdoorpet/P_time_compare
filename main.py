@@ -92,7 +92,7 @@ class TableDialog(QtGui.QDialog):
         self.cat_event_table_view.setModel(self.cat_model)
         self.pick_table_view.setModel(self.pick_model)
 
-        self.setWindowTitle('Tables')
+        self.setWindowTitle('EQ Catalogue and Picks Tables')
         self.show()
 
 
