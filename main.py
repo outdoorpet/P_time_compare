@@ -490,14 +490,31 @@ class MainWindow(QtGui.QWidget):
         row_number = focus_widget.selectionModel().selectedRows()[0].row()
         row_index = self.table_accessor[focus_widget][1][row_number]
 
-        self.selected_row = self.picks_df.loc[row_index]
+        if focus_widget == self.tbld.cat_event_table_view:
+            selected_row = self.cat_df.loc[row_index]
 
-        # set up right click menu
-        self.rc_menu = QtGui.QMenu(self)
-        self.rc_menu.addAction('Plot Single Station Residual', functools.partial(
-            self.plot_single_stn_selected, self.plot_single_stn_button, self.selected_row['sta']))
+            rc_menu = QtGui.QMenu(self)
 
-        self.rc_menu.popup(QtGui.QCursor.pos())
+            # set up the rec menu
+            rc_menu.addAction('Sort by GCARC Dist', functools.partial(
+                self.sort_method_selected, self.sort_drop_down_button, (selected_row['event_id'], 1), True))
+            rc_menu.addAction('Sort by Azimuth', functools.partial(
+                self.sort_method_selected, self.sort_drop_down_button, (selected_row['event_id'], 2), True))
+            rc_menu.addAction('Sort by Ep Dist', functools.partial(
+                self.sort_method_selected, self.sort_drop_down_button, (selected_row['event_id'], 3), True))
+
+            rc_menu.popup(QtGui.QCursor.pos())
+
+        elif focus_widget == self.tbld.pick_table_view:
+
+            selected_row = self.picks_df.loc[row_index]
+
+            # set up right click menu
+            rc_menu = QtGui.QMenu(self)
+            rc_menu.addAction('Plot Single Station Residual', functools.partial(
+                self.plot_single_stn_selected, self.plot_single_stn_button, selected_row['sta']))
+
+            rc_menu.popup(QtGui.QCursor.pos())
 
     def build_tables(self):
 
@@ -533,6 +550,10 @@ class MainWindow(QtGui.QWidget):
         # make pick table right clickable for plotting single station
         self.tbld.pick_table_view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.tbld.pick_table_view.customContextMenuRequested.connect(self.tbl_view_popup)
+
+        # make event table right clickable for sorting pick plot
+        self.tbld.cat_event_table_view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.tbld.cat_event_table_view.customContextMenuRequested.connect(self.tbl_view_popup)
 
         # Lookup Dictionary for table views
         self.tbl_view_dict = {"cat": self.tbld.cat_event_table_view, "picks": self.tbld.pick_table_view}
@@ -579,8 +600,11 @@ class MainWindow(QtGui.QWidget):
             cat_row_number = self.table_accessor[self.tbld.cat_event_table_view][1].index(cat_row_index)
             self.tbld.cat_event_table_view.selectRow(cat_row_number)
 
-            # Highlight the marker on the map
+            # Highlight the event and station marker on the map
             js_call = "highlightEvent('{event_id}');".format(event_id=self.selected_row['pick_event_id'])
+            self.view.page().mainFrame().evaluateJavaScript(js_call)
+
+            js_call = "highlightStation('{station_id}');".format(station_id=self.selected_row['sta'])
             self.view.page().mainFrame().evaluateJavaScript(js_call)
 
     def headerClicked(self, logicalIndex):
