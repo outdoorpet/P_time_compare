@@ -206,6 +206,11 @@ class MainWindow(QtGui.QWidget):
         self.plot_single_stn_button.setEnabled(False)
         buttons_hbox.addWidget(self.plot_single_stn_button)
 
+        # button to display waveforms for station or event
+        self.display_waveforms_button = QtGui.QPushButton('Display Waveforms')
+        self.display_waveforms_button.setEnabled(False)
+        buttons_hbox.addWidget(self.display_waveforms_button)
+
         # Button to Bring all events together onto a closer X axis
         self.gather_events_checkbox = QtGui.QCheckBox('Gather Events')
         Gather = functools.partial(self.gather_events_checkbox_selected)
@@ -360,6 +365,9 @@ class MainWindow(QtGui.QWidget):
     def gather_events_checkbox_selected(self):
         self.sort_method_selected(self.sort_drop_down_button, ('no_sort', 'no_sort'), False)
 
+    def build_waveform_plot(self):
+        pass
+
     def update_graph(self):
         # List of colors for individual scatter points based on the arr time residual
         col_list = self.picks_df['col_val'].apply(lambda x: self.col_grad_w.getColor(x)).tolist()
@@ -510,6 +518,12 @@ class MainWindow(QtGui.QWidget):
             rc_menu.addAction('Sort by Ep Dist', functools.partial(
                 self.sort_method_selected, self.sort_drop_down_button, (selected_row['event_id'], 3), True))
 
+            rc_menu.addSeparator()
+
+            #now add tools to display waveforms for given event
+            rc_menu.addAction('Display Waveforms for Event', functools.partial(
+                self.build_waveform_plot, self.display_waveforms_button, (selected_row['event_id'], "event")))
+
             rc_menu.popup(QtGui.QCursor.pos())
 
         elif focus_widget == self.tbld.pick_table_view:
@@ -520,6 +534,11 @@ class MainWindow(QtGui.QWidget):
             rc_menu = QtGui.QMenu(self)
             rc_menu.addAction('Plot Single Station Residual', functools.partial(
                 self.plot_single_stn_selected, self.plot_single_stn_button, selected_row['sta']))
+
+            rc_menu.addSeparator()
+
+            rc_menu.addAction('Display Waveform for Station', functools.partial(
+                self.build_waveform_plot, self.display_waveforms_button, (selected_row['sta'], "sta")))
 
             rc_menu.popup(QtGui.QCursor.pos())
 
@@ -613,14 +632,6 @@ class MainWindow(QtGui.QWidget):
 
             js_call = "highlightStation('{station_id}');".format(station_id=self.selected_row['sta'])
             self.view.page().mainFrame().evaluateJavaScript(js_call)
-
-            # if self.selected_row['sta'] in self.ref_stns:
-            #     js_call = "highlightRefStation('{station_id}');".format(station_id=self.selected_row['sta'])
-            #     self.view.page().mainFrame().evaluateJavaScript(js_call)
-            #
-            # else:
-            #     js_call = "highlightStation('{station_id}');".format(station_id=self.selected_row['sta'])
-            #     self.view.page().mainFrame().evaluateJavaScript(js_call)
 
     def headerClicked(self, logicalIndex):
         focus_widget = QtGui.QApplication.focusWidget()
