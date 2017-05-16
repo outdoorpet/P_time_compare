@@ -13,6 +13,7 @@ import sys
 residual_set_limit_ui = "residual_set_limit.ui"
 Ui_ResDialog, QtBaseClass = uic.loadUiType(residual_set_limit_ui)
 
+
 class PandasModel(QtCore.QAbstractTableModel):
     """
     Class to populate a table view with a pandas dataframe
@@ -101,7 +102,7 @@ class SingleStnPlot(QtGui.QDialog):
     Pop up window for plotting single station graph
     """
 
-    def __init__(self, parent=None, picks_df_stn = None, col_list = None, x_axis_string = None, stn=None):
+    def __init__(self, parent=None, picks_df_stn=None, col_list=None, x_axis_string=None, stn=None):
         super(SingleStnPlot, self).__init__(parent)
 
         self.picks_df_stn = picks_df_stn
@@ -126,9 +127,9 @@ class SingleStnPlot(QtGui.QDialog):
 
         # Set up the plotting area
         self.plot_area = self.single_stn_graph_view.addPlot(0, 0,
-                                                       title="Time Difference: P Theoretical - P Picked "
-                                                             "for Station: "+self.stn,
-                                                       axisItems={'bottom': self.x_axis_string})
+                                                            title="Time Difference: P Theoretical - P Picked "
+                                                                  "for Station: " + self.stn,
+                                                            axisItems={'bottom': self.x_axis_string})
         self.plot_area.setMouseEnabled(x=True, y=False)
         self.plot_area.setLabel('left', "TT Residual", units='s')
         self.plot_area.setLabel('bottom', "Event ID")
@@ -137,8 +138,8 @@ class SingleStnPlot(QtGui.QDialog):
         self.time_diff_scatter_plot = pg.ScatterPlotItem(pxMode=True)
         # self.time_diff_scatter_plot.sigClicked.connect(self.scatter_point_clicked)
         self.time_diff_scatter_plot.addPoints(self.picks_df_stn['alt_midpoints'],
-                                         self.picks_df_stn['tt_diff'], size=9,
-                                         brush=self.col_list)
+                                              self.picks_df_stn['tt_diff'], size=9,
+                                              brush=self.col_list)
         self.plot_area.addItem(self.time_diff_scatter_plot)
 
 
@@ -153,7 +154,7 @@ class ResidualSetLimit(QtGui.QDialog):
         self.resui.setupUi(self)
 
     def getValues(self):
-        return(float(self.resui.LowerLimitSpinBox.value()), float(self.resui.UpperLimitSpinBox.value()))
+        return (float(self.resui.LowerLimitSpinBox.value()), float(self.resui.UpperLimitSpinBox.value()))
 
 
 class MainWindow(QtGui.QWidget):
@@ -183,6 +184,12 @@ class MainWindow(QtGui.QWidget):
         self.open_cat_button.released.connect(openCat)
         self.open_cat_button.setEnabled(False)
         buttons_hbox.addWidget(self.open_cat_button)
+
+        self.open_ref_xml_button = QtGui.QPushButton('Open Ref StationXML')
+        openRefXml = functools.partial(self.open_ref_xml_file)
+        self.open_ref_xml_button.released.connect(openRefXml)
+        self.open_ref_xml_button.setEnabled(False)
+        buttons_hbox.addWidget(self.open_ref_xml_button)
 
         self.open_xml_button = QtGui.QPushButton('Open StationXML')
         openXml = functools.partial(self.open_xml_file)
@@ -332,8 +339,8 @@ class MainWindow(QtGui.QWidget):
 
         print(self.picks_df_stn)
 
-        self.stnplt = SingleStnPlot(parent=self, picks_df_stn = self.picks_df_stn, col_list = col_list,
-                                    x_axis_string = x_axis_string, stn=stn)
+        self.stnplt = SingleStnPlot(parent=self, picks_df_stn=self.picks_df_stn, col_list=col_list,
+                                    x_axis_string=x_axis_string, stn=stn)
 
     def reset_plot_view(self):
         self.sort_method_selected(self.sort_drop_down_button, ('no_sort', 'no_sort'), False)
@@ -607,6 +614,14 @@ class MainWindow(QtGui.QWidget):
             js_call = "highlightStation('{station_id}');".format(station_id=self.selected_row['sta'])
             self.view.page().mainFrame().evaluateJavaScript(js_call)
 
+            # if self.selected_row['sta'] in self.ref_stns:
+            #     js_call = "highlightRefStation('{station_id}');".format(station_id=self.selected_row['sta'])
+            #     self.view.page().mainFrame().evaluateJavaScript(js_call)
+            #
+            # else:
+            #     js_call = "highlightStation('{station_id}');".format(station_id=self.selected_row['sta'])
+            #     self.view.page().mainFrame().evaluateJavaScript(js_call)
+
     def headerClicked(self, logicalIndex):
         focus_widget = QtGui.QApplication.focusWidget()
         table_df = self.table_accessor[focus_widget][0]
@@ -637,12 +652,25 @@ class MainWindow(QtGui.QWidget):
     def plot_inv(self):
         # plot the stations
         print(self.inv)
-        for i, station in enumerate(self.inv[0]):
-            if station.code in self.picks_df['sta'].unique():
-                js_call = "addStation('{station_id}', {latitude}, {longitude});" \
-                    .format(station_id=station.code, latitude=station.latitude,
-                            longitude=station.longitude)
-                self.view.page().mainFrame().evaluateJavaScript(js_call)
+        for j, network in enumerate(self.inv):
+            for i, station in enumerate(network):
+                if station.code in self.picks_df['sta'].unique():
+                    # if a ref station plot yellow markers
+                    if station.code in self.ref_stns:
+                        # js_call = "addRefStation('{station_id}', {latitude}, {longitude});" \
+                        #     .format(station_id=station.code, latitude=station.latitude,
+                        #             longitude=station.longitude)
+
+                        js_call = "addStation('{station_id}', {latitude}, {longitude}, '{collection}');" \
+                            .format(station_id=station.code, latitude=station.latitude,
+                                    longitude=station.longitude, collection="REF")
+                        self.view.page().mainFrame().evaluateJavaScript(js_call)
+                    # else plot blue markers
+                    else:
+                        js_call = "addStation('{station_id}', {latitude}, {longitude}, '{collection}');" \
+                            .format(station_id=station.code, latitude=station.latitude,
+                                    longitude=station.longitude, collection="TEMP")
+                        self.view.page().mainFrame().evaluateJavaScript(js_call)
 
     def plot_events(self):
         # Plot the events
@@ -714,7 +742,7 @@ class MainWindow(QtGui.QWidget):
             # if so then append Nan so they are removed
             if self.res_limits:
                 if not self.res_limits[0] <= time_diff <= self.res_limits[1]:
-                    return(pd.Series([np.nan, np.nan, np.nan]))
+                    return (pd.Series([np.nan, np.nan, np.nan]))
 
             return (pd.Series([P_UTC, P_as_UTC, time_diff]))
 
@@ -726,7 +754,7 @@ class MainWindow(QtGui.QWidget):
 
         self.picks_df.reset_index(drop=True, inplace=True)
         self.picks_df = self.picks_df.drop(['P_pick_time', 'P_as_pick_time'], axis=1)
-        #drop any rows that have Nan in the P_as column (i.e. there is no pick for it - probably means
+        # drop any rows that have Nan in the P_as column (i.e. there is no pick for it - probably means
         # data is to noisy to pick)
         self.picks_df.dropna(subset=['P_as_pick_time_UTC'], inplace=True)
         self.picks_df.reset_index(drop=True, inplace=True)
@@ -786,7 +814,7 @@ class MainWindow(QtGui.QWidget):
 
             self.cat_df.loc[_i] = [str(event.resource_id.id).split('=')[1], int(origin_info.time.timestamp),
                                    origin_info.latitude, origin_info.longitude,
-                                   origin_info.depth/1000, magnitude]
+                                   origin_info.depth / 1000, magnitude]
 
         self.cat_df.reset_index(drop=True, inplace=True)
 
@@ -859,16 +887,40 @@ class MainWindow(QtGui.QWidget):
 
         self.gather_events_checkbox.setEnabled(True)
         self.open_xml_button.setEnabled(True)
+        self.open_ref_xml_button.setEnabled(True)
+
+    def open_ref_xml_file(self):
+        self.ref_stn_filename = str(QtGui.QFileDialog.getOpenFileName(
+            parent=self, caption="Choose Reference StationXML file",
+            directory=os.path.expanduser("~"),
+            filter="XML Files (*.xml)"))
+        if not self.ref_stn_filename:
+            return
+
+        self.ref_inv = read_inventory(self.ref_stn_filename)
+
+        self.ref_stns = []
+
+        # make list of all stations in ref inv
+        for i, station in enumerate(self.ref_inv[0]):
+            self.ref_stns.append(station.code)
 
     def open_xml_file(self):
         self.stn_filename = str(QtGui.QFileDialog.getOpenFileName(
-            parent=self, caption="Choose File",
+            parent=self, caption="Choose Temporary Deployment StationXML File",
             directory=os.path.expanduser("~"),
             filter="XML Files (*.xml)"))
         if not self.stn_filename:
             return
 
-        self.inv = read_inventory(self.stn_filename)
+        self.temp_inv = read_inventory(self.stn_filename)
+
+        # if a reference xml is loaded then merger inventories
+        try:
+            self.inv = self.temp_inv + self.ref_inv
+        except AttributeError:
+            self.inv = self.temp_inv
+
         self.plot_inv()
 
         # Now create distance to stations dict for each event
@@ -910,6 +962,7 @@ class MainWindow(QtGui.QWidget):
 
         self.plot_single_stn_button.setMenu(plot_stns_menu)
         self.plot_single_stn_button.setEnabled(True)
+
 
 if __name__ == '__main__':
     proxy_queary = query_yes_no("Input Proxy Settings?")

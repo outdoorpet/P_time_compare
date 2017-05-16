@@ -1,8 +1,9 @@
 var map = L.map('map').setView([0, 0], 0);
+
 var layer = new L.StamenTileLayer("toner");
 map.addLayer(layer);
 
-var activeIcon = L.divIcon({
+var activeStnIcon = L.divIcon({
     className: 'svg-marker',
     html: '<svg xmlns="http://www.w3.org/2000/svg" version="1.1" style="margin: 0 auto; width: 20px; height:20px;"><polygon style="fill:Red; stroke:#666666; stroke-width:2; stroke-opacity:0.5"points="0,0 20,0 10,20"/></svg>',
     iconSize: L.point(20, 20),
@@ -10,7 +11,7 @@ var activeIcon = L.divIcon({
     popupAnchor: L.point(0,-20)
 });
 
-var passiveIcon = L.divIcon({
+var passiveStnIcon = L.divIcon({
     className: 'svg-marker',
     html: '<svg xmlns="http://www.w3.org/2000/svg" version="1.1" style="margin: 0 auto; width: 20px; height:20px;"><polygon style="fill:#3D8EC9; stroke:#666666; stroke-width:2; stroke-opacity:0.5"points="0,0 20,0 10,20"/></svg>',
     iconSize: L.point(20, 20),
@@ -18,29 +19,97 @@ var passiveIcon = L.divIcon({
     popupAnchor: L.point(0,-20)
 });
 
-var events = {};
+var passiveRefStnIcon = L.divIcon({
+    className: 'svg-marker',
+    html: '<svg xmlns="http://www.w3.org/2000/svg" version="1.1" style="margin: 0 auto; width: 20px; height:20px;"><polygon style="fill:Yellow; stroke:#666666; stroke-width:2; stroke-opacity:0.5"points="0,0 20,0 10,20"/></svg>',
+    iconSize: L.point(20, 20),
+    iconAnchor: L.point(10, 20),
+    popupAnchor: L.point(0,-20)
+});
+
+// ============================================ For Stations ===============================================
 
 var stations = {};
 
-function addStation(station_id, latitude, longitude) {
+function addStation(station_id, latitude, longitude, collection) {
     var marker = L.marker([latitude, longitude], {
-        icon: passiveIcon
-    }).bindPopup(station_id).on("click", stationClick);
+        icon: activeStnIcon
+    }).on("click", stationClick);
 
-
-    marker.status = "--";
+    marker.status = "initial";
 
     marker.myCustomStationID = station_id;
 
-    marker.addTo(map);
+    map.addLayer(marker);
 
     stations[station_id] = {
         "marker": marker,
         "latitude": latitude,
-        "longitude": longitude};
+        "longitude": longitude,
+        "collection": collection};
 
     setStnMarkerInactive(stations[station_id]);
 }
+
+
+// For Stations
+function setStnMarkerActive(value) {
+    if (value.marker.status != "active") {
+        var pos = map.latLngToLayerPoint(value.marker.getLatLng()).round();
+        value.marker.setIcon(activeStnIcon);
+        value.marker.setZIndexOffset(101 - pos.y);
+        value.marker.status = "active";
+    }
+}
+
+function setStnMarkerInactive(value) {
+    if (value.marker.status != "passive") {
+        var pos = map.latLngToLayerPoint(value.marker.getLatLng()).round();
+        if (value.collection == "REF") {
+            value.marker.setIcon(passiveRefStnIcon);
+        } else if (value.collection == "TEMP") {
+            value.marker.setIcon(passiveStnIcon);
+        };
+        value.marker.setZIndexOffset(100 - pos.y);
+        value.marker.status = "passive";
+    }
+}
+
+function setStnAllInactive() {
+    _.forEach(stations, function(value, key) {
+        setStnMarkerInactive(value);
+    });
+}
+
+
+function setStnAllActive() {
+    _.forEach(stations, function(value, key) {
+        setStnMarkerActive(value);
+    });
+}
+
+
+function highlightStation(station_id) {
+    setStnAllInactive();
+//    setStnMarkerInactive(stations[station_id]);
+    var value = stations[station_id];
+    setStnMarkerActive(value)
+}
+
+
+function stationClick(e) {
+    var clickedStn = e.target;
+    clickedStn.bindPopup(clickedStn.myCustomStationID).openPopup();
+//    setStnAllActive();
+    highlightStation(clickedStn.myCustomStationID)
+//    setStnAllActive()
+//        MainWindow.onMap_stn_marker_selected(clickedStn.myCustomStationID);
+}
+
+
+
+// ==================================For Events==============================================================
+var events = {};
 
 function addEvent(event_id, df_id, row_index, latitude, longitude, a_color, p_color) {
     var marker = new L.CircleMarker(
@@ -65,15 +134,6 @@ function addEvent(event_id, df_id, row_index, latitude, longitude, a_color, p_co
         "passive_color": p_color};
 
     setMarkerInactive(events[event_id]);
-
-    if (df_id == "matched") {
-        matched_group.addLayer(marker);
-    } else if (df_id == "isc") {
-        isc_group.addLayer(marker);
-    } else if (df_id == "oth") {
-        oth_group.addLayer(marker);
-    }
-
 }
 
 
@@ -129,53 +189,5 @@ if(typeof MainWindow != 'undefined') {
     clickedCircle.bindPopup(clickedCircle.myCustomEventID).openPopup();
     MainWindow.onMap_marker_selected(clickedCircle.getLatLng().lat, clickedCircle.getLatLng().lng, clickedCircle.myCustomEventID, clickedCircle.myCustomDfID, clickedCircle.myCustomRowID)
     }
-
 }
 
-
-
-// For Stations
-function setStnMarkerActive(value) {
-    if (value.marker.status != "active") {
-        var pos = map.latLngToLayerPoint(value.marker.getLatLng()).round();
-        value.marker.setIcon(activeIcon);
-        value.marker.setZIndexOffset(101 - pos.y);
-        value.marker.status = "active";
-    }
-}
-
-function setStnMarkerInactive(value) {
-    if (value.marker.status != "passive") {
-        var pos = map.latLngToLayerPoint(value.marker.getLatLng()).round();
-        value.marker.setIcon(passiveIcon);
-        value.marker.setZIndexOffset(100 - pos.y);
-        value.marker.status = "passive";
-    }
-}
-
-function setStnAllInactive() {
-    _.forEach(stations, function(value, key) {
-        setStnMarkerInactive(value);
-    });
-}
-
-
-function setStnAllActive() {
-    _.forEach(stations, function(value, key) {
-        setStnMarkerActive(value);
-    });
-}
-
-
-function highlightStation(station_id) {
-    setStnAllInactive();
-    var value = stations[station_id];
-    setStnMarkerActive(value)
-}
-
-function stationClick(e) {
-        var clickedStn = e.target;
-
-    highlightStation(clickedStn.myCustomStationID)
-    clickedStn.bindPopup(clickedStn.myCustomStationID).openPopup();
-}
