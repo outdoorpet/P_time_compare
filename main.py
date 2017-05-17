@@ -31,7 +31,7 @@ class PandasModel(QtCore.QAbstractTableModel):
         # Column headers for tables
         self.cat_col_header = ['Event ID', 'Time (UTC Timestamp)', 'Lat (dd)', 'Lon  (dd)',
                                'Depth (km)', 'Mag', 'Time (UTC)', 'Julian Day']
-        self.pick_col_header = ['Station', 'Event ID', 'Arr Time Residual (s)', 'P Arr Time (UTC)',
+        self.pick_col_header = ['Event ID','Station', 'Arr Time Residual (s)', 'P Arr Time (UTC)',
                                 'P_as Arr Time (UTC)']
 
     def rowCount(self, parent=None):

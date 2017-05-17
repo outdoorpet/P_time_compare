@@ -34,7 +34,7 @@ var stations = {};
 function addStation(station_id, latitude, longitude, collection) {
     var marker = L.marker([latitude, longitude], {
         icon: activeStnIcon
-    }).on("click", stationClick);
+    }).bindPopup(station_id).on("click", stationClick);
 
     marker.status = "initial";
 
@@ -99,11 +99,10 @@ function highlightStation(station_id) {
 
 function stationClick(e) {
     var clickedStn = e.target;
-    clickedStn.bindPopup(clickedStn.myCustomStationID).openPopup();
-//    setStnAllActive();
-    highlightStation(clickedStn.myCustomStationID)
-//    setStnAllActive()
-//        MainWindow.onMap_stn_marker_selected(clickedStn.myCustomStationID);
+    map.closePopup();
+
+    highlightStation(clickedStn.myCustomStationID);
+    clickedStn.openPopup()
 }
 
 
