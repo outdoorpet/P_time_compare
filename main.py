@@ -224,10 +224,10 @@ class MainWindow(QtGui.QWidget):
 
         left_grid_lay = QtGui.QGridLayout()
 
-        self.graph_view = pg.GraphicsLayoutWidget()
-        self.single_stn_graph_view = pg.GraphicsLayoutWidget()
+        self.p_graph_view = pg.GraphicsLayoutWidget()
+        # self.single_stn_p_graph_view = pg.GraphicsLayoutWidget()
 
-        left_grid_lay.addWidget(self.graph_view, 0, 0, 3, 6)
+        left_grid_lay.addWidget(self.p_graph_view, 0, 0, 3, 6)
 
         self.col_grad_w = pg.GradientWidget(orientation='bottom')
         self.col_grad_w.loadPreset('spectrum')
@@ -255,25 +255,25 @@ class MainWindow(QtGui.QWidget):
         centre_hbox.addLayout(left_grid_lay)
 
         # Open StreetMAP view
-        view = self.view = QtWebKit.QWebView()
+        map_view = self.map_view = QtWebKit.QWebView()
         cache = QtNetwork.QNetworkDiskCache()
         cache.setCacheDirectory("cache")
-        view.page().networkAccessManager().setCache(cache)
-        view.page().networkAccessManager()
+        map_view.page().networkAccessManager().setCache(cache)
+        map_view.page().networkAccessManager()
 
-        view.page().mainFrame().addToJavaScriptWindowObject("MainWindow", self)
-        view.page().setLinkDelegationPolicy(QtWebKit.QWebPage.DelegateAllLinks)
-        view.load(QtCore.QUrl('map.html'))
-        view.loadFinished.connect(self.onLoadFinished)
-        view.linkClicked.connect(QtGui.QDesktopServices.openUrl)
+        map_view.page().mainFrame().addToJavaScriptWindowObject("MainWindow", self)
+        map_view.page().setLinkDelegationPolicy(QtWebKit.QWebPage.DelegateAllLinks)
+        map_view.load(QtCore.QUrl('map.html'))
+        map_view.loadFinished.connect(self.onLoadFinished)
+        map_view.linkClicked.connect(QtGui.QDesktopServices.openUrl)
 
-        centre_hbox.addWidget(view)
+        centre_hbox.addWidget(map_view)
 
         main_vbox.addLayout(centre_hbox)
 
     def onLoadFinished(self):
         with open('map.js', 'r') as f:
-            frame = self.view.page().mainFrame()
+            frame = self.map_view.page().mainFrame()
             frame.evaluateJavaScript(f.read())
 
     @QtCore.pyqtSlot(float, float, str, str, int)
@@ -282,7 +282,7 @@ class MainWindow(QtGui.QWidget):
 
     def changed_widget_focus(self):
         try:
-            if not QtGui.QApplication.focusWidget() == self.graph_view:
+            if not QtGui.QApplication.focusWidget() == self.p_graph_view:
                 self.scatter_point_deselect()
         except AttributeError:
             pass
@@ -372,7 +372,7 @@ class MainWindow(QtGui.QWidget):
         # List of colors for individual scatter points based on the arr time residual
         col_list = self.picks_df['col_val'].apply(lambda x: self.col_grad_w.getColor(x)).tolist()
 
-        self.graph_view.clear()
+        self.p_graph_view.clear()
 
         # generate unique stationID integers
         # unique_stations = self.picks_df['sta'].unique()
@@ -393,7 +393,7 @@ class MainWindow(QtGui.QWidget):
         if not self.gather_events_checkbox.isChecked():
 
             # Set up the plotting area
-            self.plot = self.graph_view.addPlot(0, 0, title="Time Difference: P Theoretical - P Picked (crosses)",
+            self.plot = self.p_graph_view.addPlot(0, 0, title="Time Difference: P Theoretical - P Picked (crosses)",
                                                 axisItems={'bottom': DateAxisItem(orientation='bottom',
                                                                                   utcOffset=0), 'left': y_axis_string})
             self.plot.setMouseEnabled(x=True, y=False)
@@ -401,7 +401,7 @@ class MainWindow(QtGui.QWidget):
             # When Mouse is moved over plot print the data coordinates
             self.plot.scene().sigMouseMoved.connect(self.dispMousePos)
 
-            # Re-establish previous view if it exists
+            # Re-establish previous map_view if it exists
             if self.saved_state:
                 self.plot.getViewBox().setState(self.saved_state)
 
@@ -436,12 +436,12 @@ class MainWindow(QtGui.QWidget):
             x_axis_string.setTicks([rearr_midpoint_dict])
 
             # Set up the plotting area
-            self.plot = self.graph_view.addPlot(0, 0, title="Time Difference: P Theoretical - P Picked (crosses)",
+            self.plot = self.p_graph_view.addPlot(0, 0, title="Time Difference: P Theoretical - P Picked (crosses)",
                                                 axisItems={'left': y_axis_string, 'bottom': x_axis_string})
             self.plot.setMouseEnabled(x=True, y=False)
             self.plot.setLabel('bottom', "Event ID")
 
-            # Re-establish previous view if it exists
+            # Re-establish previous map_view if it exists
             if self.saved_state:
                 self.plot.getViewBox().setState(self.saved_state)
 
@@ -607,7 +607,7 @@ class MainWindow(QtGui.QWidget):
 
             # Highlight the marker on the map
             js_call = "highlightEvent('{event_id}');".format(event_id=self.selected_row['event_id'])
-            self.view.page().mainFrame().evaluateJavaScript(js_call)
+            self.map_view.page().mainFrame().evaluateJavaScript(js_call)
 
         elif focus_widget == self.tbld.pick_table_view:
             self.selected_row = self.picks_df.loc[row_index]
@@ -628,10 +628,10 @@ class MainWindow(QtGui.QWidget):
 
             # Highlight the event and station marker on the map
             js_call = "highlightEvent('{event_id}');".format(event_id=self.selected_row['pick_event_id'])
-            self.view.page().mainFrame().evaluateJavaScript(js_call)
+            self.map_view.page().mainFrame().evaluateJavaScript(js_call)
 
             js_call = "highlightStation('{station_id}');".format(station_id=self.selected_row['sta'])
-            self.view.page().mainFrame().evaluateJavaScript(js_call)
+            self.map_view.page().mainFrame().evaluateJavaScript(js_call)
 
     def headerClicked(self, logicalIndex):
         focus_widget = QtGui.QApplication.focusWidget()
@@ -675,13 +675,13 @@ class MainWindow(QtGui.QWidget):
                         js_call = "addStation('{station_id}', {latitude}, {longitude}, '{collection}');" \
                             .format(station_id=station.code, latitude=station.latitude,
                                     longitude=station.longitude, collection="REF")
-                        self.view.page().mainFrame().evaluateJavaScript(js_call)
+                        self.map_view.page().mainFrame().evaluateJavaScript(js_call)
                     # else plot blue markers
                     else:
                         js_call = "addStation('{station_id}', {latitude}, {longitude}, '{collection}');" \
                             .format(station_id=station.code, latitude=station.latitude,
                                     longitude=station.longitude, collection="TEMP")
-                        self.view.page().mainFrame().evaluateJavaScript(js_call)
+                        self.map_view.page().mainFrame().evaluateJavaScript(js_call)
 
     def plot_events(self):
         # Plot the events
@@ -691,7 +691,7 @@ class MainWindow(QtGui.QWidget):
                 .format(event_id=row['event_id'], df_id="cat", row_index=int(row_index), latitude=row['lat'],
                         longitude=row['lon'], a_color="Red",
                         p_color="#008000")
-            self.view.page().mainFrame().evaluateJavaScript(js_call)
+            self.map_view.page().mainFrame().evaluateJavaScript(js_call)
 
     def open_pick_file(self):
         pick_filenames = QtGui.QFileDialog.getOpenFileNames(
